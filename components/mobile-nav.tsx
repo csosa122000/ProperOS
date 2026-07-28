@@ -10,6 +10,9 @@ const links = [
   ['Estimates', '/estimates'],
   ['Proposals', '/proposals'],
   ['Production', '/production'],
+  ['Canvassing', '/canvassing'],
+  ['Marketing', '/marketing'],
+  ['Accounting', '/accounting'],
   ['Settings', '/settings'],
 ];
 
@@ -72,7 +75,7 @@ export function MobileNav() {
 
       <nav className="mobile-tab-bar" aria-label="Quick navigation">
         <Link href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''}>Home</Link>
-        <Link href="/crm" className={pathname === '/crm' ? 'active' : ''}>CRM</Link>
+        <Link href="/crm" className={pathname === '/crm' ? 'active' : ''}>Add Lead</Link>
         <Link href="/estimates" className={pathname === '/estimates' ? 'active' : ''}>Estimates</Link>
         <button type="button" onClick={() => setOpen(true)}>More</button>
       </nav>
