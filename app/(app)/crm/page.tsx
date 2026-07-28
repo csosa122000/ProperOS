@@ -15,10 +15,9 @@ type Lead = {
 
 export default async function CRM() {
   const supabase = await createClient();
-  const [{ data: { user } }, { data: orgs }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.rpc('get_my_organizations'),
-  ]);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) await supabase.rpc('claim_pending_memberships');
+  const { data: orgs } = await supabase.rpc('get_my_organizations');
   const org = orgs?.[0];
   const { data: leads } = org
     ? await supabase
