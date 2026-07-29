@@ -2,41 +2,32 @@ import Link from 'next/link';
 import { MobileNav } from '@/components/mobile-nav';
 import { createClient } from '@/lib/supabase/server';
 
-type NavLink = [string, string];
-type NavGroup = { label: string; links: NavLink[] };
-
-const fullNavigation: NavGroup[] = [
+const fullNavigation = [
   { label: 'Overview', links: [['Company Pulse', '/dashboard']] },
-  {
-    label: 'Operations',
-    links: [
-      ['Sales', '/sales'],
-      ['Production', '/production'],
-      ['Canvassing', '/canvassing'],
-      ['CRM / Add Lead', '/crm'],
-    ],
-  },
+  { label: 'Operations', links: [['Sales', '/sales'], ['Production', '/production'], ['Canvassing', '/canvassing']] },
   { label: 'Documents', links: [['Estimates', '/estimates'], ['Contracts & Proposals', '/proposals']] },
-  { label: 'Business', links: [['Marketing', '/marketing'], ['Accounting', '/accounting']] },
-  { label: 'People', links: [['Employees & Contractors', '/people']] },
+  { label: 'Business', links: [['Marketing', '/marketing'], ['Accounting', '/accounting'], ['Human Resources', '/human-resources']] },
   { label: 'Development', links: [['Proper University', '/training']] },
-  { label: 'System', links: [['Settings', '/settings']] },
+  { label: 'System', links: [['Employees & Contractors', '/team'], ['Settings', '/settings']] },
 ];
 
-const departmentLinks: Record<string, NavLink[]> = {
-  sales: [['Sales Home', '/sales'], ['CRM / Add Lead', '/crm'], ['Estimates', '/estimates'], ['Contracts & Proposals', '/proposals'], ['Proper University', '/training']],
-  canvassing: [['Canvassing Home', '/canvassing'], ['CRM / Add Lead', '/crm'], ['Proper University', '/training']],
-  production: [['Production Home', '/production'], ['Contracts & Proposals', '/proposals'], ['Proper University', '/training']],
-  marketing: [['Marketing Home', '/marketing'], ['Proper University', '/training']],
-  accounting: [['Accounting Home', '/accounting'], ['Contracts & Proposals', '/proposals'], ['Proper University', '/training']],
+const departmentLinks: Record<string, [string, string][]> = {
+  sales: [['Sales', '/sales'], ['Estimates', '/estimates'], ['Contracts & Proposals', '/proposals'], ['Proper University', '/training']],
+  canvassing: [['Canvassing', '/canvassing'], ['Proper University', '/training']],
+  production: [['Production', '/production'], ['Proper University', '/training']],
+  marketing: [['Marketing', '/marketing'], ['Proper University', '/training']],
+  accounting: [['Accounting', '/accounting'], ['Human Resources', '/human-resources'], ['Proper University', '/training']],
+  administration: [['Human Resources', '/human-resources'], ['Employees & Contractors', '/team'], ['Settings', '/settings']],
 };
 
-function getNavigation(role?: string, department?: string): NavGroup[] {
-  if (['super_user', 'administrator', 'manager'].includes(role || '')) return fullNavigation;
-  const links = departmentLinks[(department || '').toLowerCase()] || [['Proper University', '/training']];
+function getNavigation(role?: string, department?: string) {
+  const normalizedRole = role?.toLowerCase().replaceAll(' ', '_');
+  const canSeeFullMenu = ['super_user', 'administrator', 'manager'].includes(normalizedRole || '');
+  if (canSeeFullMenu) return fullNavigation;
+  const links = departmentLinks[(department || '').toLowerCase()] || [];
   return [
     { label: 'Overview', links: [['Company Pulse', '/dashboard']] },
-    { label: 'My Workspace', links },
+    ...(links.length ? [{ label: 'Workspace', links }] : []),
   ];
 }
 
@@ -45,17 +36,15 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const { data: { user } } = await supabase.auth.getUser();
   if (user) await supabase.rpc('claim_pending_memberships');
   const { data: orgs } = await supabase.rpc('get_my_organizations');
-
-  const role = String(user?.app_metadata?.role || user?.user_metadata?.role || 'team_member');
-  const department = String(user?.app_metadata?.department || user?.user_metadata?.department || '');
-  const navigationGroups = getNavigation(role, department);
+  const membership = orgs?.[0];
+  const navigationGroups = getNavigation(membership?.role, membership?.department);
 
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand">Proper OS</div>
-      <div className="org"><small>Company</small><div>{orgs?.[0]?.organization_name || 'Proper Remodeling'}</div></div>
+      <div className="org"><small>Company</small><div>{membership?.organization_name || 'Proper Remodeling'}</div></div>
       <nav className="nav" aria-label="Main navigation">
-        {navigationGroups.map((group) => <div className="nav-group" key={group.label}>
+        {navigationGroups.map(group => <div className="nav-group" key={group.label}>
           <div className="nav-group-label">{group.label}</div>
           {group.links.map(([name, href]) => <Link key={href} href={href}>{name}</Link>)}
         </div>)}
@@ -63,7 +52,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     </aside>
     <main className="main">
       <header className="top app-header">
-        <div><strong>Proper Remodeling</strong><div style={{ color: '#6b7280' }}>{department ? `${department} · ` : ''}{user?.email}</div></div>
+        <div><strong>Proper Remodeling</strong><div style={{ color: '#6b7280' }}>{user?.email}</div></div>
         <div className="actions"><MobileNav navigationGroups={navigationGroups}/><button className="secondary notifications-button">Notifications</button></div>
       </header>
       {children}

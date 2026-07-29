@@ -4,13 +4,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-type NavLink = [string, string];
-type NavGroup = { label: string; links: NavLink[] };
+type NavigationGroup = { label: string; links: string[][] };
 
-export function MobileNav({ navigationGroups }: { navigationGroups: NavGroup[] }) {
+export function MobileNav({ navigationGroups }: { navigationGroups: NavigationGroup[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const quickLinks = navigationGroups.flatMap((group) => group.links).filter(([, href]) => href !== '/dashboard').slice(0, 2);
+  const quickLinks = navigationGroups.flatMap(group => group.links).filter(([, href]) => href !== '/dashboard').slice(0, 2);
 
   return (
     <>
@@ -27,7 +26,7 @@ export function MobileNav({ navigationGroups }: { navigationGroups: NavGroup[] }
               <button type="button" className="mobile-nav-close" aria-label="Close navigation" onClick={() => setOpen(false)}>×</button>
             </div>
             <nav className="mobile-nav-links">
-              {navigationGroups.map((group) => (
+              {navigationGroups.map(group => (
                 <div className="mobile-nav-group" key={group.label}>
                   <div className="mobile-nav-group-label">{group.label}</div>
                   {group.links.map(([name, href]) => (
@@ -43,8 +42,8 @@ export function MobileNav({ navigationGroups }: { navigationGroups: NavGroup[] }
       )}
 
       <nav className="mobile-tab-bar" aria-label="Quick navigation">
-        <Link href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''}>Home</Link>
-        {quickLinks.map(([name, href]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''}>{name.replace(' Home', '')}</Link>)}
+        <Link href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''}>Company Pulse</Link>
+        {quickLinks.map(([name, href]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''}>{name}</Link>)}
         <button type="button" onClick={() => setOpen(true)}>More</button>
       </nav>
     </>
