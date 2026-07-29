@@ -4,18 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 
-const navigationGroups = [
-  { label: 'Overview', links: [['Dashboard', '/dashboard']] },
-  { label: 'Sales', links: [['CRM / Add Lead', '/crm'], ['Sales Production', '/sales'], ['Canvassing', '/canvassing']] },
-  { label: 'Projects', links: [['Estimates', '/estimates'], ['Contracts & Proposals', '/proposals'], ['Production', '/production']] },
-  { label: 'Business', links: [['Marketing', '/marketing'], ['Accounting', '/accounting']] },
-  { label: 'Development', links: [['Proper University', '/training']] },
-  { label: 'System', links: [['Settings', '/settings']] },
-];
+type NavLink = [string, string];
+type NavGroup = { label: string; links: NavLink[] };
 
-export function MobileNav() {
+export function MobileNav({ navigationGroups }: { navigationGroups: NavGroup[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const quickLinks = navigationGroups.flatMap((group) => group.links).filter(([, href]) => href !== '/dashboard').slice(0, 2);
 
   return (
     <>
@@ -49,8 +44,7 @@ export function MobileNav() {
 
       <nav className="mobile-tab-bar" aria-label="Quick navigation">
         <Link href="/dashboard" className={pathname === '/dashboard' ? 'active' : ''}>Home</Link>
-        <Link href="/crm" className={pathname === '/crm' ? 'active' : ''}>Add Lead</Link>
-        <Link href="/estimates" className={pathname === '/estimates' ? 'active' : ''}>Estimates</Link>
+        {quickLinks.map(([name, href]) => <Link key={href} href={href} className={pathname === href ? 'active' : ''}>{name.replace(' Home', '')}</Link>)}
         <button type="button" onClick={() => setOpen(true)}>More</button>
       </nav>
     </>
