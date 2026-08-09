@@ -27,14 +27,17 @@ export function ContractActions({contract,userId}:{contract:ContractRow;userId:s
     if(!representative)return;
     setSaving(true);setMessage('');
     const supabase=createClient();
+    const {data:existing,error:readError}=await supabase.from('contracts').select('general_terms').eq('id',contract.id).single();
+    if(readError){setMessage(readError.message);setSaving(false);return;}
     const signedAt=new Date().toISOString();
+    const priorTerms=(existing?.general_terms&&typeof existing.general_terms==='object')?existing.general_terms:{};
     const {error}=await supabase.from('contracts').update({
       status:'signed',
       signed_at:signedAt,
       agreement_effective_date:signedAt.slice(0,10),
       cancellation_notice_acknowledged:true,
       representative_name:representative,
-      general_terms:{signature:{homeowner:signer,representative,signed_at:signedAt},cancellation_notice_acknowledged:true},
+      general_terms:{...priorTerms,signature:{homeowner:signer,representative,signed_at:signedAt},cancellation_notice_acknowledged:true},
       updated_by:userId,
     }).eq('id',contract.id).eq('status','ready_for_signature');
     if(error){setMessage(error.message);}else{setStatus('signed');setMessage('Contract signed. Production, Sales, and Accounting handoffs have been triggered.');}
