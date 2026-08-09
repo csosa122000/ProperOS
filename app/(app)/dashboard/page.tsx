@@ -1,33 +1,10 @@
 import Link from 'next/link';
-import { NewLeadForm } from '@/components/new-lead-form';
 import { createClient } from '@/lib/supabase/server';
 
-const metrics=[['Annual sales to date','$0'],['Annual volume on pace','0%'],['Leads this month','0'],['Sales this month','$0']];
+const metrics=[['Annual sales to date','$0'],['Annual on pace percentage','0%'],['Monthly volume','$0'],['Monthly on pace percentage','0%'],['Total leads this month','0'],['Total sales this month','$0']];
+const topReps=[{rank:1,name:'No sales data yet',sales:'$0'},{rank:2,name:'—',sales:'$0'},{rank:3,name:'—',sales:'$0'}];
 
 export default async function Dashboard(){
-  const supabase=await createClient();
-  const {data:{user}}=await supabase.auth.getUser();
-  if(user)await supabase.rpc('claim_pending_memberships');
-  const {data:orgs}=await supabase.rpc('get_my_organizations');
-  const org=orgs?.[0];
-
-  return <>
-    <div className="top dashboard-heading">
-      <div><h1>Company Pulse</h1><p>Company performance, lead flow, sales pace, and operating activity.</p></div>
-      {user&&org&&<NewLeadForm organizationId={org.organization_id} branchId={org.default_branch_id} currentUserId={user.id}/>}
-    </div>
-    <section className="quick-actions" aria-label="Quick actions">
-      <Link href="/crm">View leads</Link>
-      <Link href="/canvassing">Canvassing</Link>
-      <Link href="/marketing">Marketing</Link>
-      <Link href="/production">Production</Link>
-    </section>
-    <section className="grid">{metrics.map(([l,v])=><div className="card metric" key={l}><span>{l}</span><strong>{v}</strong></div>)}</section>
-    <section className="card section"><h2>Today</h2><table className="table"><thead><tr><th>Time</th><th>Customer</th><th>Project</th><th>Status</th></tr></thead><tbody><tr><td colSpan={4}>No appointments scheduled.</td></tr></tbody></table></section>
-    <section className="module-grid section">
-      <Link className="card module-link" href="/crm"><h3>Sales Pipeline</h3><p>Lead intake, appointments, and close tracking.</p><span>Open CRM →</span></Link>
-      <Link className="card module-link" href="/production"><h3>Production</h3><p>Scheduling, remeasures, materials, crews, quality, service, and completion.</p><span>Open production →</span></Link>
-      <Link className="card module-link" href="/proposals"><h3>Proposal Center</h3><p>Branded proposals using Proper pricing rules.</p><span>Open proposals →</span></Link>
-    </section>
-  </>
+  const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(user)await supabase.rpc('claim_pending_memberships');const {data:orgs}=await supabase.rpc('get_my_organizations');const org=orgs?.[0];
+  return <><div className="top dashboard-heading"><div><h1>Company Pulse</h1><p>Company performance, department activity, and current announcements.</p></div></div><section className="grid">{metrics.map(([label,value])=><div className="card metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}</section><section className="card section"><div className="section-heading"><div><h2>Top Three Representatives</h2><p>Ranked by sold volume for the current period.</p></div></div><table className="table"><thead><tr><th>Rank</th><th>Representative</th><th>Sales Volume</th></tr></thead><tbody>{topReps.map(rep=><tr key={rep.rank}><td>#{rep.rank}</td><td>{rep.name}</td><td>{rep.sales}</td></tr>)}</tbody></table></section><section className="card section"><div className="section-heading"><div><h2>Company Posts</h2><p>Visible to every employee and contractor as the shared overview feed.</p></div></div><p>No company posts have been published.</p></section>{org&&<section className="module-grid section"><Link className="card module-link" href="/sales"><h3>Sales</h3><p>Personal production, appointments, pipeline, and closing performance.</p><span>Open sales →</span></Link><Link className="card module-link" href="/production"><h3>Production</h3><p>Remeasures, materials, crews, schedules, quality, service, and job completion.</p><span>Open production →</span></Link><Link className="card module-link" href="/proposals"><h3>Documents</h3><p>Estimates, proposals, and contracts.</p><span>Open documents →</span></Link></section>}</>;
 }
