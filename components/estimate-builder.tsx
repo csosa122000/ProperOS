@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 
 type Category={id:string;name:string;slug:string;miscellaneous_fee:number;markup_rate:number;today_discount_rate:number};
 type Item={id:string;category_id:string;product_name:string;option_name:string;name:string;sku:string;unit:string;base_unit_price:number;included_allowance_rate:number|null;allowance_mode:string};
+type Lead={id:string;customer_id:string|null;first_name:string;last_name:string;email:string|null;phone:string|null;status:string;project_interest:string[];address:string};
 type QtyMap=Record<string,number>;
 
 function tierMatch(items:Item[],qty:number){
@@ -19,8 +20,9 @@ function tierMatch(items:Item[],qty:number){
   return items[0];
 }
 
-export function EstimateBuilder({categories,items,organizationId,userId}:{categories:Category[];items:Item[];organizationId:string;userId:string}){
+export function EstimateBuilder({categories,items,leads,organizationId,userId}:{categories:Category[];items:Item[];leads:Lead[];organizationId:string;userId:string}){
   const [categoryId,setCategoryId]=useState(categories[0]?.id||'');
+  const [leadId,setLeadId]=useState('');
   const [qty,setQty]=useState<QtyMap>({});
   const [title,setTitle]=useState('');
   const [address,setAddress]=useState('');
@@ -39,20 +41,31 @@ export function EstimateBuilder({categories,items,organizationId,userId}:{catego
   const today=ninety*(1-Number(category?.today_discount_rate||0));
   const money=(n:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
 
+  function chooseLead(id:string){
+    setLeadId(id);
+    const lead=leads.find(l=>l.id===id);
+    if(!lead)return;
+    const customerName=`${lead.first_name||''} ${lead.last_name||''}`.trim();
+    if(!title)setTitle(customerName?`${customerName} — ${category?.name||'Project'}`:`${category?.name||'Project'}`);
+    if(!address&&lead.address)setAddress(lead.address);
+  }
+
   async function save(){
     if(!category||!selected.length){setMessage('Add at least one priced item first.');return;}
+    if(!leadId){setMessage('Select the CRM lead/customer for this estimate.');return;}
     setSaving(true);setMessage('');const supabase=createClient();
-    const {data:estimate,error}=await supabase.from('estimates').insert({organization_id:organizationId,title:title||`${category.name} Project`,project_name:title||`${category.name} Project`,project_address:address||null,category_slug:category.slug,status:'draft',base_subtotal:base,miscellaneous_fee:misc,markup_rate:category.markup_rate,today_discount_rate:category.today_discount_rate,ninety_day_price:ninety,today_price:today,created_by:userId}).select('id,estimate_number').single();
+    const {data:estimate,error}=await supabase.from('estimates').insert({organization_id:organizationId,lead_id:leadId,title:title||`${category.name} Project`,project_name:title||`${category.name} Project`,project_address:address||null,category_slug:category.slug,status:'draft',base_subtotal:base,miscellaneous_fee:misc,markup_rate:category.markup_rate,today_discount_rate:category.today_discount_rate,ninety_day_price:ninety,today_price:today,created_by:userId}).select('id,estimate_number').single();
     if(error){setMessage(error.message);setSaving(false);return;}
     const rows=selected.map(x=>({estimate_id:estimate.id,organization_id:organizationId,pricing_item_id:x.item.id,sku:x.item.sku,name:x.item.name,unit:x.item.unit,quantity:x.q,unit_price:x.item.base_unit_price,line_total:x.line,allowance_mode:x.item.allowance_mode,included_allowance_rate:x.item.included_allowance_rate}));
     const {error:itemError}=await supabase.from('estimate_items').insert(rows);
     if(itemError){setMessage(`Estimate saved, but line items failed: ${itemError.message}`);setSaving(false);return;}
-    setMessage(`Estimate ${estimate.estimate_number||''} saved. Open Proposals to generate the Proper Remodeling proposal.`);setSaving(false);
+    setMessage(`Estimate ${estimate.estimate_number||''} saved and linked to the CRM lead. Open Proposals to generate the Proper Remodeling proposal.`);setSaving(false);
   }
 
   return <>
     <div className="card">
       <div className="form-grid">
+        <label className="field">CRM lead / customer<select value={leadId} onChange={e=>chooseLead(e.target.value)} required><option value="">Select lead…</option>{leads.map(l=><option value={l.id} key={l.id}>{`${l.first_name||''} ${l.last_name||''}`.trim()||'Unnamed lead'}{l.customer_id?` — ${l.customer_id}`:''}</option>)}</select></label>
         <label className="field">Project name<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Customer / project"/></label>
         <label className="field">Project address<input value={address} onChange={e=>setAddress(e.target.value)} placeholder="Job address"/></label>
         <label className="field">Project category<select value={categoryId} onChange={e=>{setCategoryId(e.target.value);setQty({});}}>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
@@ -64,6 +77,6 @@ export function EstimateBuilder({categories,items,organizationId,userId}:{catego
       </div>
     </div>
     <section className="grid section"><div className="card metric"><span>Base subtotal</span><strong>{money(base)}</strong></div><div className="card metric"><span>Category misc.</span><strong>{money(misc)}</strong></div><div className="card metric"><span>90-day price</span><strong>{money(ninety)}</strong></div><div className="card metric"><span>Today price</span><strong>{money(today)}</strong></div></section>
-    <div className="card section"><h3>Proper pricing workflow</h3><p>Master/base pricing + category miscellaneous fee → 25% markup → 90-day contract price → 15% Today discount. Pricing option #3 is removed; standard pricing is the default.</p>{message&&<p>{message}</p>}<button className="primary button-auto" onClick={save} disabled={saving||!selected.length}>{saving?'Saving…':'Save Estimate & Continue to Proposal'}</button></div>
+    <div className="card section"><h3>Proper pricing workflow</h3><p>Master/base pricing + category miscellaneous fee → 25% markup → 90-day contract price → 15% Today discount. Pricing option #3 is removed; standard pricing is the default.</p>{message&&<p>{message}</p>}<button className="primary button-auto" onClick={save} disabled={saving||!selected.length||!leadId}>{saving?'Saving…':'Save Estimate & Continue to Proposal'}</button></div>
   </>;
 }
