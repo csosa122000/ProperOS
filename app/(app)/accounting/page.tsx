@@ -1,16 +1,12 @@
-export default function Accounting(){
-  return <>
-    <div><h1>Accounting</h1><p>Owner and accounting access for receivables, payments, commissions, and profitability.</p></div>
-    <section className="grid section">
-      <div className="card metric"><span>Accounts receivable</span><strong>$0</strong></div>
-      <div className="card metric"><span>Collected this month</span><strong>$0</strong></div>
-      <div className="card metric"><span>Outstanding commissions</span><strong>$0</strong></div>
-      <div className="card metric"><span>Gross profit</span><strong>$0</strong></div>
-    </section>
-    <section className="module-grid section">
-      <div className="card"><h3>Customer payments</h3><p>Track deposits, progress payments, balances, and collections.</p></div>
-      <div className="card"><h3>Sales commissions</h3><p>Calculate rep commissions using Proper Remodeling rules.</p></div>
-      <div className="card"><h3>QuickBooks</h3><p>Accounting synchronization and reconciliation will live here.</p></div>
-    </section>
-  </>
+import { createClient } from '@/lib/supabase/server';
+
+const money=(n:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0));
+type Summary={accounts_receivable:number;collected_this_month:number;outstanding_commissions:number;gross_profit:number;funded_sales:number};
+
+type Job={id:string;contract_number:string;customer_name:string;sold_price:number;funded_at:string|null;status:string};
+
+export default async function Accounting(){
+  const supabase=await createClient();const {data:{user}}=await supabase.auth.getUser();if(user)await supabase.rpc('claim_pending_memberships');const {data:orgs}=await supabase.rpc('get_my_organizations');const org=orgs?.[0];let summary:Summary|undefined;let activeJobs:Job[]=[];
+  if(org){const [{data:s},{data:jobs}]=await Promise.all([supabase.rpc('get_accounting_summary',{target_organization_id:org.organization_id}),supabase.from('accounting_jobs').select('id,contract_number,customer_name,sold_price,funded_at,status').eq('organization_id',org.organization_id).neq('status','void').order('signed_at',{ascending:false}).limit(12)]);summary=(s?.[0]||undefined) as Summary|undefined;activeJobs=(jobs||[]) as Job[];}
+  return <><div><h1>Accounting</h1><p>Live receivables, collections, funded volume, commissions, and job profitability.</p></div><section className="grid section"><div className="card metric"><span>Accounts receivable</span><strong>{money(summary?.accounts_receivable||0)}</strong></div><div className="card metric"><span>Collected this month</span><strong>{money(summary?.collected_this_month||0)}</strong></div><div className="card metric"><span>Outstanding commissions</span><strong>{money(summary?.outstanding_commissions||0)}</strong></div><div className="card metric"><span>Gross profit</span><strong>{money(summary?.gross_profit||0)}</strong></div><div className="card metric"><span>Funded sales</span><strong>{money(summary?.funded_sales||0)}</strong></div></section><section className="card section"><h2>Funding & Commission Readiness</h2><p>Commission records remain protected by the existing funded-job rule: a commission cannot be marked paid until its accounting job is funded.</p><table className="table"><thead><tr><th>Contract</th><th>Customer</th><th>Sold Price</th><th>Funding</th></tr></thead><tbody>{activeJobs.length?activeJobs.map(job=><tr key={job.id}><td>{job.contract_number}</td><td>{job.customer_name}</td><td>{money(job.sold_price)}</td><td><span className="pill">{job.funded_at?'Funded':'Awaiting funding'}</span></td></tr>):<tr><td colSpan={4}>No accounting jobs yet.</td></tr>}</tbody></table></section><section className="module-grid section"><div className="card"><h3>Customer payments</h3><p>Deposits, progress payments, final payments, finance funding, and refunds roll into receivables automatically.</p></div><div className="card"><h3>Sales commissions</h3><p>Outstanding commission totals use pending and approved commission records, with funded-job controls preserved.</p></div><div className="card"><h3>Job costs</h3><p>Gross profit uses committed and paid job costs against sold revenue.</p></div></section></>;
 }

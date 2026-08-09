@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 
 export async function createClient() {
   const cookieStore = await cookies();
+  type CookieToSet = { name: string; value: string; options?: Parameters<typeof cookieStore.set>[2] };
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,11 +11,9 @@ export async function createClient() {
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
-        setAll: (items) => {
+        setAll: (items: CookieToSet[]) => {
           try {
-            items.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
+            items.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
           } catch {}
         },
       },
