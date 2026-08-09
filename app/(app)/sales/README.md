@@ -1,0 +1,1 @@
+This Sales workspace is carried forward from the earlier Codex branch and retained in the integrated preview branch so Sales-specific reporting can be connected to live commission and leaderboard data in the next stabilization pass.
