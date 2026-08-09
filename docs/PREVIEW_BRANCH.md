@@ -1,0 +1,1 @@
+`agent/proper-os-integrated-preview` is the non-production reconciliation branch for visual preview and validation. Do not merge to `main` until the application build and end-to-end workflows are verified.

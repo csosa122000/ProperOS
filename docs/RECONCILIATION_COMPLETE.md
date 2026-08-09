@@ -1,0 +1,1 @@
+The integrated preview branch now contains the PR #4 feature set plus the preserved Company Pulse, Sales workspace, and role-aware navigation concepts from PR #3. Remaining work is build/deployment validation, not branch reconciliation.
