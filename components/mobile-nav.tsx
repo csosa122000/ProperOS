@@ -12,6 +12,7 @@ const links = [
   ['Production', '/production'],
   ['Canvassing', '/canvassing'],
   ['Marketing', '/marketing'],
+  ['Human Resources', '/human-resources'],
   ['Accounting', '/accounting'],
   ['Settings', '/settings'],
 ];
