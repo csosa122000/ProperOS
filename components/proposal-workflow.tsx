@@ -15,7 +15,20 @@ export function ProposalWorkflow({estimates,initialProposals}:{organizationId:st
   const [proposals,setProposals]=useState(initialProposals),[message,setMessage]=useState(''),[previewId,setPreviewId]=useState<string|null>(null),[generatingId,setGeneratingId]=useState<string|null>(null),[revision,setRevision]=useState('');
   const money=(n:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0));
   const estimateFor=(p:Proposal)=>estimates.find(e=>e.id===p.estimate_id);
-  async function callAI(e:Estimate,proposal?:Proposal){setMessage('');setGeneratingId(proposal?.id||e.id);try{const res=await fetch('/api/ai/proposal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({estimateId:e.id,proposalId:proposal?.id||null,direction:proposal?revision:''})});const payload=await res.json();if(!res.ok){setMessage(payload.error||'AI proposal generation failed.');return;}const p=payload.proposal as Proposal;if(proposal)setProposals(proposals.map(x=>x.id===p.id?p:x));else setProposals([p,...proposals]);setPreviewId(p.id);setRevision('');setMessage(proposal?`${p.proposal_number} updated. Pricing stayed locked to the approved estimate.`:`${p.proposal_number} created by the AI Proposal Designer from the locked Proper estimate.`);}finally{setGeneratingId(null);}}
+  async function callAI(e:Estimate,proposal?:Proposal){
+    setMessage('');setGeneratingId(proposal?.id||e.id);
+    try{
+      const supabase=createClient();
+      const {data,error}=await supabase.functions.invoke('proper-ai-proposal',{body:{estimateId:e.id,proposalId:proposal?.id||null,revisionInstruction:proposal?revision:''}});
+      if(error){setMessage(error.message||'AI proposal generation failed.');return;}
+      if(data?.error){setMessage(data.error);return;}
+      const p=data?.proposal as Proposal;
+      if(!p){setMessage('AI proposal generation returned no proposal.');return;}
+      if(proposal)setProposals(proposals.map(x=>x.id===p.id?p:x));else setProposals([p,...proposals]);
+      setPreviewId(p.id);setRevision('');
+      setMessage(proposal?`${p.proposal_number} updated. Pricing stayed locked to the approved estimate.`:`${p.proposal_number} created by the AI Proposal Designer through Supabase from the locked Proper estimate.`);
+    }finally{setGeneratingId(null);}
+  }
   async function accept(p:Proposal){const name=window.prompt('Customer name accepting this proposal:');if(!name)return;const supabase=createClient();const acceptedAt=new Date().toISOString();const {error}=await supabase.from('customer_proposals').update({status:'accepted',accepted_by_name:name,accepted_at:acceptedAt}).eq('id',p.id);if(error){setMessage(error.message);return;}setProposals(proposals.map(x=>x.id===p.id?{...x,status:'accepted',accepted_by_name:name,accepted_at:acceptedAt}:x));setMessage('Proposal accepted. Create Contract is now available.');}
   const hasProposal=(estimateId:string)=>proposals.some(p=>p.estimate_id===estimateId);const preview=proposals.find(p=>p.id===previewId);const pe=preview?estimateFor(preview):undefined;const ai=preview?.proposal_content?.ai;
   return <>{message&&<div className="card section"><p>{message}</p></div>}
