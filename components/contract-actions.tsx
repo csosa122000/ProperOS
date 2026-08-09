@@ -3,55 +3,15 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
-type ContractRow={id:string;contract_number:string;status:string;cancellation_notice_acknowledged:boolean|null};
+type ContractRow={id:string;contract_number:string;status:string;cancellation_notice_acknowledged:boolean|null;customer_name:string;co_homeowner_name:string|null;representative_name:string|null;co_representative_name:string|null;general_terms:Record<string,unknown>|null};
 
 export function ContractActions({contract,userId}:{contract:ContractRow;userId:string}){
-  const [status,setStatus]=useState(contract.status);
-  const [ack,setAck]=useState(Boolean(contract.cancellation_notice_acknowledged));
-  const [message,setMessage]=useState('');
-  const [saving,setSaving]=useState(false);
-
-  async function markReady(){
-    setSaving(true);setMessage('');
-    const supabase=createClient();
-    const {error}=await supabase.from('contracts').update({status:'ready_for_signature',updated_by:userId}).eq('id',contract.id).eq('status','draft');
-    if(error){setMessage(error.message);}else{setStatus('ready_for_signature');setMessage('Contract is ready for signature.');}
-    setSaving(false);
-  }
-
-  async function sign(){
-    if(!ack){setMessage('Acknowledge the 3-day cancellation notice before signing.');return;}
-    const signer=window.prompt('Name of homeowner signing this contract:');
-    if(!signer)return;
-    const representative=window.prompt('Name of company representative signing this contract:');
-    if(!representative)return;
-    setSaving(true);setMessage('');
-    const supabase=createClient();
-    const {data:existing,error:readError}=await supabase.from('contracts').select('general_terms').eq('id',contract.id).single();
-    if(readError){setMessage(readError.message);setSaving(false);return;}
-    const signedAt=new Date().toISOString();
-    const priorTerms=(existing?.general_terms&&typeof existing.general_terms==='object')?existing.general_terms:{};
-    const {error}=await supabase.from('contracts').update({
-      status:'signed',
-      signed_at:signedAt,
-      agreement_effective_date:signedAt.slice(0,10),
-      cancellation_notice_acknowledged:true,
-      representative_name:representative,
-      general_terms:{...priorTerms,signature:{homeowner:signer,representative,signed_at:signedAt},cancellation_notice_acknowledged:true},
-      updated_by:userId,
-    }).eq('id',contract.id).eq('status','ready_for_signature');
-    if(error){setMessage(error.message);}else{setStatus('signed');setMessage('Contract signed. Production, Sales, and Accounting handoffs have been triggered.');}
-    setSaving(false);
-  }
-
-  if(status==='signed') return <span className="pill">signed</span>;
-  if(status==='void') return <span className="pill">void</span>;
-  return <div style={{display:'grid',gap:6,minWidth:190}}>
-    {status==='draft'&&<button type="button" className="secondary" disabled={saving} onClick={markReady}>Ready for Signature</button>}
-    {status==='ready_for_signature'&&<>
-      <label style={{display:'flex',gap:6,alignItems:'center',fontSize:12}}><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/>3-day cancellation notice acknowledged</label>
-      <button type="button" className="primary button-auto" disabled={saving} onClick={sign}>Sign Contract</button>
-    </>}
-    {message&&<small>{message}</small>}
-  </div>;
+  const [status,setStatus]=useState(contract.status);const [ack,setAck]=useState(Boolean(contract.cancellation_notice_acknowledged));const [open,setOpen]=useState(false);const [message,setMessage]=useState('');const [saving,setSaving]=useState(false);
+  const [homeownerSig,setHomeownerSig]=useState(contract.customer_name||'');const [coHomeownerSig,setCoHomeownerSig]=useState('');const [repSig,setRepSig]=useState(contract.representative_name||'');const [coRepSig,setCoRepSig]=useState('');
+  async function markReady(){setSaving(true);setMessage('');const supabase=createClient();const {error}=await supabase.from('contracts').update({status:'ready_for_signature',updated_by:userId}).eq('id',contract.id).eq('status','draft');if(error)setMessage(error.message);else{setStatus('ready_for_signature');setOpen(true);setMessage('Contract is ready for signatures.');}setSaving(false);}
+  async function sign(){if(!ack){setMessage('Acknowledge the 3-day cancellation notice before signing.');return;}if(!homeownerSig.trim()||!repSig.trim()){setMessage('Primary homeowner and representative signatures are required.');return;}if(contract.co_homeowner_name&&!coHomeownerSig.trim()){setMessage('The co-homeowner signature is required for this contract.');return;}if(contract.co_representative_name&&!coRepSig.trim()){setMessage('The second representative signature is required for this contract.');return;}setSaving(true);setMessage('');const supabase=createClient();const signedAt=new Date().toISOString();const priorTerms=(contract.general_terms&&typeof contract.general_terms==='object')?contract.general_terms:{};const signature={method:'typed_ipad_signature',signed_at:signedAt,homeowner:{name:contract.customer_name,signature:homeownerSig.trim()},co_homeowner:contract.co_homeowner_name?{name:contract.co_homeowner_name,signature:coHomeownerSig.trim()}:null,representative:{name:contract.representative_name||repSig.trim(),signature:repSig.trim()},co_representative:contract.co_representative_name?{name:contract.co_representative_name,signature:coRepSig.trim()}:null};const {error}=await supabase.from('contracts').update({status:'signed',signed_at:signedAt,agreement_effective_date:signedAt.slice(0,10),cancellation_notice_acknowledged:true,general_terms:{...priorTerms,signature,cancellation_notice_acknowledged:true},updated_by:userId}).eq('id',contract.id).eq('status','ready_for_signature');if(error)setMessage(error.message);else{setStatus('signed');setOpen(false);setMessage('Contract signed. Production, Sales, and Accounting handoffs have been triggered.');}setSaving(false);}
+  if(status==='signed')return <div><span className="pill">signed</span>{message&&<small style={{display:'block',marginTop:5}}>{message}</small>}</div>;if(status==='void')return <span className="pill">void</span>;
+  return <div style={{display:'grid',gap:8,minWidth:210}}>{status==='draft'&&<button type="button" className="secondary" disabled={saving} onClick={markReady}>Ready for Signature</button>}{status==='ready_for_signature'&&<button type="button" className="primary button-auto" onClick={()=>setOpen(!open)}>{open?'Close Signing':'Open Signing Screen'}</button>}{open&&status==='ready_for_signature'&&<div style={{position:'fixed',inset:0,zIndex:50,background:'rgba(0,0,0,.72)',display:'grid',placeItems:'center',padding:18}}><div className="card" style={{width:'min(900px,96vw)',maxHeight:'92vh',overflow:'auto',padding:28}}><div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'start'}}><div><small>{contract.contract_number}</small><h2 style={{margin:'4px 0'}}>Contract Signing</h2><p>Review the agreement, acknowledge the cancellation notice, and sign below.</p></div><button className="secondary" type="button" onClick={()=>setOpen(false)}>Close</button></div><div style={{border:'1px solid #ddd',borderRadius:12,padding:18,margin:'18px 0'}}><label style={{display:'flex',gap:10,alignItems:'flex-start'}}><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)} style={{marginTop:4}}/><span><strong>3-Day Right to Cancel / Rescission Notice</strong><br/><small>I acknowledge receipt and review of the applicable cancellation notice and contract documents.</small></span></label></div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:16}}><SignatureField label="Homeowner Signature" name={contract.customer_name} value={homeownerSig} onChange={setHomeownerSig} required/>{contract.co_homeowner_name&&<SignatureField label="Co-Homeowner Signature" name={contract.co_homeowner_name} value={coHomeownerSig} onChange={setCoHomeownerSig} required/>}<SignatureField label="Representative Signature" name={contract.representative_name||'Company Representative'} value={repSig} onChange={setRepSig} required/>{contract.co_representative_name&&<SignatureField label="Second Representative Signature" name={contract.co_representative_name} value={coRepSig} onChange={setCoRepSig} required/>}</div><div style={{marginTop:18,padding:14,borderRadius:10,background:'#f5f5f5',fontSize:13}}>Typing a full legal name in a signature field records that name as the electronic signature for this contract together with the signing timestamp.</div>{message&&<p>{message}</p>}<div style={{display:'flex',justifyContent:'flex-end',marginTop:18}}><button className="primary button-auto" type="button" disabled={saving} onClick={sign}>{saving?'Signing…':'Complete Signatures & Execute Contract'}</button></div></div></div>}{message&&<small>{message}</small>}</div>;
 }
+
+function SignatureField({label,name,value,onChange,required}:{label:string;name:string;value:string;onChange:(v:string)=>void;required?:boolean}){return <label style={{border:'1px solid #ddd',borderRadius:12,padding:16,display:'grid',gap:8}}><strong>{label}</strong><small>{name}</small><input value={value} onChange={e=>onChange(e.target.value)} placeholder="Type full legal name" required={required} style={{fontSize:20,fontFamily:'cursive',padding:'12px 10px',border:'none',borderBottom:'1px solid #222',outline:'none'}}/><small>Electronic signature</small></label>}
