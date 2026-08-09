@@ -1,86 +1,26 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
-const jobTitles = [
-  'Owner',
-  'General Manager',
-  'Sales Manager',
-  'Sales Representative',
-  'Production Manager',
-  'Project Manager',
-  'Canvassing Manager',
-  'Canvasser',
-  'Marketing Manager',
-  'Telemarketer',
-  'Accounting',
-  'Office Administrator',
-  'Contractor',
-];
+const jobTitles=['Owner','General Manager','Sales Manager','Sales Representative','Production Manager','Project Manager','Canvassing Manager','Canvasser','Marketing Manager','Telemarketer','Accounting','Office Administrator','Contractor'];
+const departments=['Executive','Sales','Production','Canvassing','Marketing','Accounting','Human Resources'];
+const roleMap:Record<string,string>={'Owner':'owner','General Manager':'manager','Sales Manager':'sales_manager','Sales Representative':'sales','Production Manager':'production_manager','Project Manager':'production','Canvassing Manager':'canvassing_manager','Canvasser':'canvassing','Marketing Manager':'marketing_manager','Telemarketer':'marketing','Accounting':'accounting','Office Administrator':'admin','Contractor':'contractor'};
+const accessOptions=['Company Pulse','CRM','Estimates','Proposals','Contracts','Production','Canvassing','Marketing','Accounting','Proper University','Reports','Settings'];
 
-const departments = ['Executive', 'Sales', 'Production', 'Canvassing', 'Marketing', 'Accounting', 'Human Resources'];
-const branches = ['Austin'];
-const accessOptions = ['Company Pulse', 'CRM', 'Estimates', 'Proposals', 'Contracts', 'Production', 'Canvassing', 'Marketing', 'Accounting', 'Proper University', 'Reports', 'Settings'];
+type Branch={id:string;name:string};
 
-export default function HumanResources() {
-  const [message, setMessage] = useState('');
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage('Team member profile is ready to save once the HR database migration is connected.');
+export default function HumanResources(){
+  const [message,setMessage]=useState(''); const [error,setError]=useState(''); const [saving,setSaving]=useState(false); const [branches,setBranches]=useState<Branch[]>([]);
+  useEffect(()=>{(async()=>{const supabase=createClient();const {data:orgs}=await supabase.rpc('get_my_organizations');const org=orgs?.[0];if(!org)return;const {data}=await supabase.from('organization_branches').select('id,name').eq('organization_id',org.organization_id).is('deleted_at',null).order('name');setBranches((data||[]) as Branch[]);})();},[]);
+  async function submit(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();setSaving(true);setError('');setMessage('');const form=event.currentTarget;const fd=new FormData(form);const supabase=createClient();const {data:{user}}=await supabase.auth.getUser();const {data:orgs}=await supabase.rpc('get_my_organizations');const org=orgs?.[0];if(!user||!org){setError('Your Proper OS workspace is not active.');setSaving(false);return;}
+    const jobTitle=String(fd.get('jobTitle'));const inviteOption=String(fd.get('inviteOption'));const access=fd.getAll('access').map(String);
+    const {data:member,error:memberError}=await supabase.from('workforce_members').insert({organization_id:org.organization_id,branch_id:String(fd.get('branch'))||null,first_name:String(fd.get('firstName')),last_name:String(fd.get('lastName')),email:String(fd.get('email')),worker_type:String(fd.get('workerType')),department:String(fd.get('department')),job_title:jobTitle,status:String(fd.get('status')),access_level:access.join(','),access_notes:access.join(', '),account_status:inviteOption==='none'?'not_invited':'invited',invitation_role_key:roleMap[jobTitle]||'member',invitation_requested_at:inviteOption==='none'?null:new Date().toISOString(),created_by:user.id}).select('id').single();
+    if(memberError){setError(memberError.message);setSaving(false);return;}
+    const docs=[['job_offer',fd.get('jobOffer')],['welcome_letter',fd.get('welcomeLetter')]] as const;for(const [type,value] of docs){if(value instanceof File&&value.size>0){await supabase.from('workforce_onboarding_documents').insert({organization_id:org.organization_id,workforce_member_id:member.id,document_type:type,file_name:value.name,file_path:`pending/${member.id}/${value.name}`,content_type:value.type||null,file_size_bytes:value.size,created_by:user.id});}}
+    if(inviteOption!=='none'){const {error:inviteError}=await supabase.rpc('invite_organization_member',{target_organization_id:org.organization_id,invite_email:String(fd.get('email')),target_role_key:roleMap[jobTitle]||'member',target_branch_id:String(fd.get('branch'))||null});if(inviteError){setError(`Profile saved, but invite could not be queued: ${inviteError.message}`);setSaving(false);return;}}
+    setMessage(inviteOption==='none'?'Team member saved.':'Team member saved and Proper OS invitation queued.');form.reset();setSaving(false);
   }
-
-  return (
-    <>
-      <div className="top">
-        <div>
-          <h1>Human Resources</h1>
-          <p>Add employees and contractors, assign their role and branch, and control Proper OS access.</p>
-        </div>
-      </div>
-
-      <form className="card" onSubmit={submit}>
-        <div className="form-section" style={{borderTop:0,marginTop:0,paddingTop:0}}>
-          <h3>Team member</h3>
-          <div className="form-grid">
-            <label className="field">First name<input name="firstName" required /></label>
-            <label className="field">Last name<input name="lastName" required /></label>
-            <label className="field">Email<input name="email" type="email" required /></label>
-            <label className="field">Worker type<select name="workerType" defaultValue="employee"><option value="employee">Employee</option><option value="contractor">Contractor</option></select></label>
-            <label className="field">Job title<select name="jobTitle" defaultValue="Sales Representative">{jobTitles.map(title=><option key={title}>{title}</option>)}</select></label>
-            <label className="field">Branch<select name="branch">{branches.map(branch=><option key={branch}>{branch}</option>)}</select></label>
-            <label className="field">Department<select name="department">{departments.map(department=><option key={department}>{department}</option>)}</select></label>
-            <label className="field">Status<select name="status" defaultValue="active"><option value="active">Active</option><option value="pending">Pending</option><option value="inactive">Inactive</option></select></label>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3>Assigned access</h3>
-          <p>Select the areas this person can access.</p>
-          <div className="module-grid">
-            {accessOptions.map(option => (
-              <label className="card" style={{padding:'14px',boxShadow:'none'}} key={option}>
-                <input type="checkbox" name="access" value={option} /> {option}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3>Onboarding</h3>
-          <div className="form-grid">
-            <label className="field">Job offer<input name="jobOffer" type="file" accept=".pdf,.doc,.docx" /></label>
-            <label className="field">Welcome letter<input name="welcomeLetter" type="file" accept=".pdf,.doc,.docx" /></label>
-            <label className="field"><span>Invite options</span><select name="inviteOption" defaultValue="invite"><option value="invite">Invite to Proper OS</option><option value="welcome">Email welcome letter + invite</option><option value="none">Save without sending invite</option></select></label>
-          </div>
-        </div>
-
-        {message && <p>{message}</p>}
-        <div className="modal-actions">
-          <button className="secondary" type="reset">Clear</button>
-          <button className="primary button-auto" type="submit">Add team member</button>
-        </div>
-      </form>
-    </>
-  );
+  return <><div className="top"><div><h1>Human Resources</h1><p>Add employees and contractors, assign branch/department/access, attach onboarding documents, and invite them to Proper OS.</p></div></div><form className="card" onSubmit={submit}><div className="form-section" style={{borderTop:0,marginTop:0,paddingTop:0}}><h3>Team member</h3><div className="form-grid"><label className="field">First name<input name="firstName" required/></label><label className="field">Last name<input name="lastName" required/></label><label className="field">Email<input name="email" type="email" required/></label><label className="field">Worker type<select name="workerType"><option value="employee">Employee</option><option value="contractor">Contractor</option></select></label><label className="field">Job title<select name="jobTitle" defaultValue="Sales Representative">{jobTitles.map(x=><option key={x}>{x}</option>)}</select></label><label className="field">Branch<select name="branch" required>{branches.map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select></label><label className="field">Department<select name="department">{departments.map(x=><option key={x}>{x}</option>)}</select></label><label className="field">Status<select name="status"><option value="active">Active</option><option value="pending">Pending</option><option value="inactive">Inactive</option></select></label></div></div><div className="form-section"><h3>Assigned access</h3><div className="module-grid">{accessOptions.map(x=><label className="card" style={{padding:'14px',boxShadow:'none'}} key={x}><input type="checkbox" name="access" value={x}/> {x}</label>)}</div></div><div className="form-section"><h3>Onboarding</h3><div className="form-grid"><label className="field">Job offer<input name="jobOffer" type="file" accept=".pdf,.doc,.docx"/></label><label className="field">Welcome letter<input name="welcomeLetter" type="file" accept=".pdf,.doc,.docx"/></label><label className="field">Invite options<select name="inviteOption"><option value="invite">Invite to Proper OS</option><option value="welcome">Email welcome letter + invite</option><option value="none">Save without sending invite</option></select></label></div></div>{error&&<p className="error">{error}</p>}{message&&<p>{message}</p>}<div className="modal-actions"><button className="secondary" type="reset">Clear</button><button className="primary button-auto" disabled={saving}>{saving?'Saving…':'Add team member'}</button></div></form></>;
 }
