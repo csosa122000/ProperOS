@@ -6,7 +6,7 @@ type NavGroup={label:string;links:[string,string][]};
 
 const fullNavigation:NavGroup[]=[
   {label:'Overview',links:[['Company Pulse','/dashboard']]},
-  {label:'Operations',links:[['Sales','/sales'],['Production','/production'],['Canvassing','/canvassing']]},
+  {label:'Operations',links:[['Sales','/sales'],['Appointments','/appointments'],['Production','/production'],['Canvassing','/canvassing']]},
   {label:'Documents',links:[['Estimates','/estimates'],['Proposals','/proposals'],['Contracts','/contracts']]},
   {label:'Business',links:[['Marketing','/marketing'],['Accounting','/accounting'],['Human Resources','/human-resources']]},
   {label:'Development',links:[['Proper University','/university']]},
@@ -17,7 +17,7 @@ function navigationForRoles(roles:string[]=[]):NavGroup[]{
   const roleSet=new Set(roles);
   if(['company_owner','company_admin','company_manager'].some(role=>roleSet.has(role))) return fullNavigation;
   const links:[string,string][]=[];
-  if(roleSet.has('sales_rep')) links.push(['Sales','/sales'],['Estimates','/estimates'],['Proposals','/proposals'],['Contracts','/contracts']);
+  if(roleSet.has('sales_rep')) links.push(['Sales','/sales'],['Appointments','/appointments'],['Estimates','/estimates'],['Proposals','/proposals'],['Contracts','/contracts']);
   if(roleSet.has('production')) links.push(['Production','/production']);
   if(roleSet.has('canvassing')) links.push(['Canvassing','/canvassing']);
   if(roleSet.has('marketing')) links.push(['Marketing','/marketing']);
