@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { AccountingFundingAction } from '@/components/accounting-funding-action';
+import { AccountingPayoutReport } from '@/components/accounting-payout-report';
 
 const money=(n:number)=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(Number(n||0));
 const dateTime=(value:string|null)=>value?new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'—';
@@ -54,6 +55,7 @@ export default async function Accounting(){
         {activeJobs.length?activeJobs.map(job=>{const stage=fundingStage(job);const eligible=canManageFunding&&stage==='pre_funding';return <tr key={job.id}><td>{job.contract_number}</td><td>{job.customer_name}</td><td>{money(job.sold_price)}</td><td>{money(job.required_down_payment)}</td><td><span className="pill">{stageLabel(stage)}</span></td><td>{dateTime(job.rescission_clears_at)}</td><td>{stage==='pre_funding'?<AccountingFundingAction jobId={job.id} eligible={eligible}/>:stage==='funded'?`Received ${dateTime(job.funded_at)}`:stage==='closed'?'Closed':'Locked until rescission clears'}</td></tr>}):<tr><td colSpan={7}>No accounting jobs yet.</td></tr>}
       </tbody></table>
     </section>
+    <AccountingPayoutReport rows={[]} liveDataConnected={false}/>
     <section className="module-grid section"><div className="card"><h3>Customer payments</h3><p>Deposits, progress payments, final payments, finance funding, and refunds roll into receivables automatically.</p></div><div className="card"><h3>Sales commissions</h3><p>Signed sales can show expected commission immediately, but credited volume remains locked until Accounting confirms funding.</p></div><div className="card"><h3>Job costs</h3><p>Gross profit uses committed and paid job costs against sold revenue.</p></div></section>
   </>;
 }
