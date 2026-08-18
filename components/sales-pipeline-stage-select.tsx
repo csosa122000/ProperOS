@@ -18,7 +18,7 @@ const stages=[
   ['lost','Lost / No Sale'],
 ] as const;
 
-const editableStages=new Set(['new_lead','appointment_set','in_progress','estimate_proposal','follow_up','contract_signed','lost']);
+const editableStages:Set<string>=new Set(['new_lead','appointment_set','in_progress','estimate_proposal','follow_up','contract_signed','lost']);
 
 export function SalesPipelineStageSelect({leadId,value,locked=false}:{leadId:string;value:string;locked?:boolean}){
   const router=useRouter();
