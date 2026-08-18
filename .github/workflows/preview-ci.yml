@@ -5,9 +5,14 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: proper-os-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
